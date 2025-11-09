@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests;
 
-use App\TaskStatus;
+use App\Enums\TaskStatus;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,7 +33,8 @@ class TaskRequest extends FormRequest
             'status' => ['sometimes', 'required', Rule::enum(TaskStatus::class)],
             'due_date' => ['nullable', 'date', 'after_or_equal:today'],
             'assignee_id' => ['nullable', 'exists:users,id'],
-            'attachment' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
+            'attachments' => ['nullable', 'array'],
+            'attachments.*' => ['file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
         ];
     }
 }

@@ -2,15 +2,19 @@
 
 namespace App\Models;
 
-use App\TaskStatus;
+use App\Enums\TaskStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class Task extends Model
+class Task extends Model implements HasMedia
 {
     /** @use HasFactory<\Database\Factories\TaskFactory> */
     use HasFactory;
+
+    use InteractsWithMedia;
 
     protected $fillable = [
         'project_id',
@@ -19,7 +23,6 @@ class Task extends Model
         'status',
         'due_date',
         'assignee_id',
-        'attachment',
     ];
 
     protected function casts(): array
@@ -28,6 +31,11 @@ class Task extends Model
             'status' => TaskStatus::class,
             'due_date' => 'date',
         ];
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('attachments');
     }
 
     public function project(): BelongsTo

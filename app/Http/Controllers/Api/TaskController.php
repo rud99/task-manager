@@ -10,7 +10,6 @@ use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
@@ -37,13 +36,15 @@ class TaskController extends Controller
     {
         $this->authorize('view', $project);
 
-        $data = $request->validated();
-
-        if ($request->hasFile('attachment')) {
-            $data['attachment'] = $request->file('attachment')->store('attachments', 'public');
-        }
+        $data = $request->except('attachments');
 
         $task = $project->tasks()->create($data);
+
+        if ($request->hasFile('attachments')) {
+            foreach ($request->file('attachments') as $file) {
+                $task->addMedia($file)->toMediaCollection('attachments');
+            }
+        }
 
         return new TaskResource($task->load('assignee'));
     }
@@ -57,18 +58,20 @@ class TaskController extends Controller
 
     public function update(TaskRequest $request, Task $task): TaskResource
     {
+//        dd(json_decode($request->getContent(), true));
+//        dd($request->all());
         $this->authorize('update', $task);
 
-        $data = $request->validated();
-
-        if ($request->hasFile('attachment')) {
-            if ($task->attachment) {
-                Storage::disk('public')->delete($task->attachment);
-            }
-            $data['attachment'] = $request->file('attachment')->store('attachments', 'public');
-        }
+        $data = $request->except('attachments');
 
         $task->update($data);
+
+        if ($request->hasFile('attachments')) {
+            $task->clearMediaCollection('attachments');
+            foreach ($request->file('attachments') as $file) {
+                $task->addMedia($file)->toMediaCollection('attachments');
+            }
+        }
 
         return new TaskResource($task->load('assignee'));
     }
@@ -76,10 +79,6 @@ class TaskController extends Controller
     public function destroy(Task $task): JsonResponse
     {
         $this->authorize('delete', $task);
-
-        if ($task->attachment) {
-            Storage::disk('public')->delete($task->attachment);
-        }
 
         $task->delete();
 

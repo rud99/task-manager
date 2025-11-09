@@ -2,13 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
-use App\TaskStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class TaskTest extends TestCase
@@ -129,10 +128,8 @@ class TaskTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_user_can_create_task_with_attachment(): void
+    public function test_user_can_create_task_with_attachments(): void
     {
-        Storage::fake('public');
-
         $user = User::factory()->create();
         $project = Project::factory()->create(['user_id' => $user->id]);
 
@@ -141,13 +138,14 @@ class TaskTest extends TestCase
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [
                 'title' => 'Test Task',
-                'attachment' => $file,
+                'attachments' => [$file],
             ]);
 
-        $response->assertStatus(201);
+        $response->assertStatus(201)
+            ->assertJsonPath('data.attachments.0.file_name', 'document.pdf');
 
         $task = Task::query()->where('title', 'Test Task')->first();
-        Storage::disk('public')->assertExists($task->attachment);
+        $this->assertCount(1, $task->getMedia('attachments'));
     }
 
     public function test_user_can_view_task_in_their_project(): void
@@ -218,32 +216,29 @@ class TaskTest extends TestCase
         $response->assertStatus(403);
     }
 
-    public function test_user_can_update_task_attachment(): void
+    public function test_user_can_update_task_attachments(): void
     {
-        Storage::fake('public');
-
         $user = User::factory()->create();
         $project = Project::factory()->create(['user_id' => $user->id]);
-        $task = Task::factory()->create([
-            'project_id' => $project->id,
-            'attachment' => 'attachments/old-file.pdf',
-        ]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
 
-        Storage::disk('public')->put('attachments/old-file.pdf', 'old content');
+        $oldFile = UploadedFile::fake()->create('old-document.pdf', 100);
+        $task->addMedia($oldFile)->toMediaCollection('attachments');
 
         $newFile = UploadedFile::fake()->create('new-document.pdf', 100);
 
         $response = $this->actingAs($user)
             ->putJson("/api/tasks/{$task->id}", [
                 'title' => $task->title,
-                'attachment' => $newFile,
+                'attachments' => [$newFile],
             ]);
 
-        $response->assertStatus(200);
+        $response->assertStatus(200)
+            ->assertJsonPath('data.attachments.0.file_name', 'new-document.pdf');
 
         $task->refresh();
-        Storage::disk('public')->assertExists($task->attachment);
-        Storage::disk('public')->assertMissing('attachments/old-file.pdf');
+        $this->assertCount(1, $task->getMedia('attachments'));
+        $this->assertEquals('new-document.pdf', $task->getFirstMedia('attachments')->file_name);
     }
 
     public function test_user_can_delete_task_in_their_project(): void
@@ -279,25 +274,25 @@ class TaskTest extends TestCase
         ]);
     }
 
-    public function test_deleting_task_removes_attachment(): void
+    public function test_deleting_task_removes_attachments(): void
     {
-        Storage::fake('public');
-
         $user = User::factory()->create();
         $project = Project::factory()->create(['user_id' => $user->id]);
-        $task = Task::factory()->create([
-            'project_id' => $project->id,
-            'attachment' => 'attachments/file.pdf',
-        ]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
 
-        Storage::disk('public')->put('attachments/file.pdf', 'content');
+        $file = UploadedFile::fake()->create('file.pdf', 100);
+        $task->addMedia($file)->toMediaCollection('attachments');
+
+        $mediaId = $task->getFirstMedia('attachments')->id;
 
         $response = $this->actingAs($user)
             ->deleteJson("/api/tasks/{$task->id}");
 
         $response->assertStatus(204);
 
-        Storage::disk('public')->assertMissing('attachments/file.pdf');
+        $this->assertDatabaseMissing('media', [
+            'id' => $mediaId,
+        ]);
     }
 
     public function test_user_cannot_create_task_with_invalid_status(): void

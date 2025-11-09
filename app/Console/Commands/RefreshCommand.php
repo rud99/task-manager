@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Storage;
 
 class RefreshCommand extends Command
 {
@@ -30,6 +31,11 @@ class RefreshCommand extends Command
         }
 
         $this->call('cache:clear');
+
+        // чистим медиа библиотеку
+        $mediaDisk = Storage::disk('media');
+        $mediaDisk->delete($mediaDisk->allFiles());
+        $mediaDisk->deleteDirectory('');
 
         $this->call('migrate:fresh', [
             '--seed' => true,

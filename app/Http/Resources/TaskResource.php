@@ -27,7 +27,14 @@ class TaskResource extends JsonResource
                 'name' => $this->assignee->name,
                 'email' => $this->assignee->email,
             ]),
-            'attachment' => $this->attachment,
+            'attachments' => $this->getMedia('attachments')->map(fn ($media) => [
+                'id' => $media->id,
+                'name' => $media->name,
+                'file_name' => $media->file_name,
+                'mime_type' => $media->mime_type,
+                'size' => $media->size,
+                'url' => $media->getUrl(),
+            ]),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

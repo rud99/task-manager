@@ -19,7 +19,6 @@ return new class extends Migration
             $table->string('status')->default('planned');
             $table->date('due_date')->nullable();
             $table->foreignId('assignee_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('attachment')->nullable();
             $table->timestamps();
         });
     }
