@@ -28,6 +28,18 @@ class TaskController extends Controller
             $query->where('assignee_id', $request->input('assignee_id'));
         }
 
+        if ($request->filled('due_date')) {
+            $query->whereDate('due_date', $request->input('due_date'));
+        }
+
+        if ($request->filled('due_date_from')) {
+            $query->whereDate('due_date', '>=', $request->input('due_date_from'));
+        }
+
+        if ($request->filled('due_date_to')) {
+            $query->whereDate('due_date', '<=', $request->input('due_date_to'));
+        }
+
         $tasks = $query->latest()->get();
 
         return TaskResource::collection($tasks);

@@ -91,6 +91,62 @@ class TaskTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_user_can_filter_tasks_by_exact_due_date(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $targetDate = now()->addDays(5)->format('Y-m-d');
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => $targetDate,
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => now()->addDays(10)->format('Y-m-d'),
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks?due_date={$targetDate}");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.due_date', $targetDate);
+    }
+
+    public function test_user_can_filter_tasks_by_due_date_range(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => now()->addDays(5)->format('Y-m-d'),
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => now()->addDays(10)->format('Y-m-d'),
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => now()->addDays(15)->format('Y-m-d'),
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'due_date' => now()->addDays(20)->format('Y-m-d'),
+        ]);
+
+        $dateFrom = now()->addDays(8)->format('Y-m-d');
+        $dateTo = now()->addDays(16)->format('Y-m-d');
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks?due_date_from={$dateFrom}&due_date_to={$dateTo}");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+    }
+
     public function test_user_can_create_task_in_their_project(): void
     {
         $user = User::factory()->create();
