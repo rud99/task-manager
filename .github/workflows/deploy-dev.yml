@@ -1,0 +1,47 @@
+name: Deploy to DEV VPS
+
+on:
+  push:
+    branches: [ dev ]
+
+env:
+  USER_DATA_PATH: /var/www/13018_usr/data
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to DEV server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.DEV_HOST }}
+        username: ${{ secrets.DEV_USERNAME }}
+        key: ${{ secrets.DEV_SSH_KEY }}
+        script: |
+          cd ${{ env.USER_DATA_PATH }}/www/dev.task-manager.ru/
+          ${{ env.USER_DATA_PATH }}/bin/php artisan down
+
+          git reset --hard
+          git pull origin dev
+
+          ${{ env.USER_DATA_PATH }}/bin/php /usr/local/bin/composer install
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan key:generate
+          ${{ env.USER_DATA_PATH }}/bin/php artisan migrate --force
+          ${{ env.USER_DATA_PATH }}/bin/php artisan optimize:clear
+          ${{ env.USER_DATA_PATH }}/bin/php artisan storage:link
+
+          chown -R 13018_usr:13018_usr .
+          find . -type f -exec chmod 664 {} \;
+          find . -type d -exec chmod 775 {} \;
+          chgrp -R 13018_usr storage bootstrap/cache
+          chmod -R ug+rwx storage bootstrap/cache
+
+          supervisorctl restart task-manager-dev-worker:*
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan optimize
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan up

@@ -1,0 +1,47 @@
+name: Deploy to PRODUCTION VPS
+
+on:
+  workflow_dispatch:
+    branches: [ master ]
+
+env:
+  USER_DATA_PATH: /var/www/task-manager_usr/data
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to PRODUCTION server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.PROD_HOST }}
+        username: ${{ secrets.PROD_USERNAME }}
+        key: ${{ secrets.PROD_SSH_KEY }}
+        script: |
+          cd ${{ env.USER_DATA_PATH }}/www/prod-dev.task-manager.ru/
+          ${{ env.USER_DATA_PATH }}/bin/php artisan down
+
+          git reset --hard
+          git pull origin master
+
+          ${{ env.USER_DATA_PATH }}/bin/php /usr/local/bin/composer install --no-dev --optimize-autoloader
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan migrate --force
+          ${{ env.USER_DATA_PATH }}/bin/php artisan optimize:clear
+          ${{ env.USER_DATA_PATH }}/bin/php artisan storage:link
+
+          chown -R task-manager_usr:task-manager_usr .
+          find . -type f -exec chmod 644 {} \;
+          find . -type d -exec chmod 755 {} \;
+          chgrp -R task-manager_usr storage bootstrap/cache
+          chmod -R ug+rwx storage bootstrap/cache
+
+          supervisorctl restart task-manager-prod-worker:*
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan optimize
+
+          ${{ env.USER_DATA_PATH }}/bin/php artisan up
