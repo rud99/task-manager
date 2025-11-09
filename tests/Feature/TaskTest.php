@@ -6,8 +6,10 @@ use App\Enums\TaskStatus;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
+use App\Notifications\TaskCreatedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 class TaskTest extends TestCase
@@ -323,5 +325,51 @@ class TaskTest extends TestCase
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['due_date']);
+    }
+
+    public function test_notification_sent_when_task_created_with_assignee(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        $assignee = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'description' => 'Test description',
+                'status' => 'planned',
+                'assignee_id' => $assignee->id,
+            ]);
+
+        $response->assertStatus(201);
+
+        Notification::assertSentTo(
+            [$assignee],
+            TaskCreatedNotification::class,
+            function (TaskCreatedNotification $notification) use ($assignee): bool {
+                return $notification->task->assignee_id === $assignee->id;
+            }
+        );
+    }
+
+    public function test_notification_not_sent_when_task_created_without_assignee(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'description' => 'Test description',
+                'status' => 'planned',
+            ]);
+
+        $response->assertStatus(201);
+
+        Notification::assertNothingSent();
     }
 }

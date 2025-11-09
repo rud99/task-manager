@@ -7,6 +7,7 @@ use App\Http\Requests\TaskRequest;
 use App\Http\Resources\TaskResource;
 use App\Models\Project;
 use App\Models\Task;
+use App\Notifications\TaskCreatedNotification;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -46,7 +47,13 @@ class TaskController extends Controller
             }
         }
 
-        return new TaskResource($task->load('assignee'));
+        $task->load('assignee', 'project');
+
+        if ($task->assignee_id) {
+            $task->assignee->notify(new TaskCreatedNotification($task));
+        }
+
+        return new TaskResource($task);
     }
 
     public function show(Task $task): TaskResource
@@ -58,8 +65,8 @@ class TaskController extends Controller
 
     public function update(TaskRequest $request, Task $task): TaskResource
     {
-//        dd(json_decode($request->getContent(), true));
-//        dd($request->all());
+        //        dd(json_decode($request->getContent(), true));
+        //        dd($request->all());
         $this->authorize('update', $task);
 
         $data = $request->except('attachments');
