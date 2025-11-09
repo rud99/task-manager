@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\TaskStatus;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class TaskRequest extends FormRequest
 {
@@ -11,7 +13,7 @@ class TaskRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -21,8 +23,17 @@ class TaskRequest extends FormRequest
      */
     public function rules(): array
     {
+        $isUpdate = $this->isMethod('PUT') || $this->isMethod('PATCH');
+
         return [
-            //
+            'title' => $isUpdate
+                ? ['sometimes', 'required', 'string', 'max:255']
+                : ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'status' => ['sometimes', 'required', Rule::enum(TaskStatus::class)],
+            'due_date' => ['nullable', 'date', 'after_or_equal:today'],
+            'assignee_id' => ['nullable', 'exists:users,id'],
+            'attachment' => ['nullable', 'file', 'max:10240', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
         ];
     }
 }
