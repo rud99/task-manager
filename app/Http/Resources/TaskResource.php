@@ -19,7 +19,7 @@ class TaskResource extends JsonResource
             'project_id' => $this->project_id,
             'title' => $this->title,
             'description' => $this->description,
-            'status' => $this->status->value,
+            'status' => $this->status?->value,
             'due_date' => $this->due_date?->format('Y-m-d'),
             'assignee_id' => $this->assignee_id,
             'assignee' => $this->whenLoaded('assignee', fn () => [

@@ -11,11 +11,6 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ProjectController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(Project::class, 'project');
-    }
-
     public function index(): AnonymousResourceCollection
     {
         $projects = auth()->user()->projects()->latest()->get();
@@ -32,11 +27,15 @@ class ProjectController extends Controller
 
     public function show(Project $project): ProjectResource
     {
+        $this->authorize('view', $project);
+
         return new ProjectResource($project);
     }
 
     public function update(ProjectRequest $request, Project $project): ProjectResource
     {
+        $this->authorize('update', $project);
+
         $project->update($request->validated());
 
         return new ProjectResource($project);
@@ -44,6 +43,8 @@ class ProjectController extends Controller
 
     public function destroy(Project $project): JsonResponse
     {
+        $this->authorize('delete', $project);
+
         $project->delete();
 
         return response()->json(['message' => 'Project deleted successfully'], 204);

@@ -1,0 +1,332 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Project;
+use App\Models\Task;
+use App\Models\User;
+use App\TaskStatus;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Tests\TestCase;
+
+class TaskTest extends TestCase
+{
+    use RefreshDatabase;
+
+    public function test_user_can_get_tasks_for_their_project(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $tasks = Task::factory(3)->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(3, 'data');
+    }
+
+    public function test_user_cannot_get_tasks_for_other_users_project(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $otherUser->id]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_user_can_filter_tasks_by_status(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => TaskStatus::Planned,
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => TaskStatus::InProgress,
+        ]);
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => TaskStatus::Done,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks?status=in_progress");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.status', 'in_progress');
+    }
+
+    public function test_user_can_filter_tasks_by_assignee(): void
+    {
+        $user = User::factory()->create();
+        $assignee1 = User::factory()->create();
+        $assignee2 = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        Task::factory()->create([
+            'project_id' => $project->id,
+            'assignee_id' => $assignee1->id,
+        ]);
+        Task::factory(2)->create([
+            'project_id' => $project->id,
+            'assignee_id' => $assignee2->id,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/tasks?assignee_id={$assignee2->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonCount(2, 'data');
+    }
+
+    public function test_user_can_create_task_in_their_project(): void
+    {
+        $user = User::factory()->create();
+        $assignee = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'description' => 'Test description',
+                'status' => 'planned',
+                'due_date' => now()->addDays(7)->format('Y-m-d'),
+                'assignee_id' => $assignee->id,
+            ]);
+
+        $response->assertStatus(201)
+            ->assertJsonPath('data.title', 'Test Task')
+            ->assertJsonPath('data.status', 'planned');
+
+        $this->assertDatabaseHas('tasks', [
+            'title' => 'Test Task',
+            'project_id' => $project->id,
+        ]);
+    }
+
+    public function test_user_cannot_create_task_in_other_users_project(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $otherUser->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_user_can_create_task_with_attachment(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $file = UploadedFile::fake()->create('document.pdf', 100);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'attachment' => $file,
+            ]);
+
+        $response->assertStatus(201);
+
+        $task = Task::query()->where('title', 'Test Task')->first();
+        Storage::disk('public')->assertExists($task->attachment);
+    }
+
+    public function test_user_can_view_task_in_their_project(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.id', $task->id)
+            ->assertJsonPath('data.title', $task->title);
+    }
+
+    public function test_user_cannot_view_task_in_other_users_project(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $otherUser->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->getJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(403);
+    }
+
+    public function test_user_can_update_task_in_their_project(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'status' => TaskStatus::Planned,
+        ]);
+
+        $response = $this->actingAs($user)
+            ->putJson("/api/tasks/{$task->id}", [
+                'title' => 'Updated Task',
+                'status' => 'in_progress',
+            ]);
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.title', 'Updated Task')
+            ->assertJsonPath('data.status', 'in_progress');
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+            'title' => 'Updated Task',
+            'status' => 'in_progress',
+        ]);
+    }
+
+    public function test_user_cannot_update_task_in_other_users_project(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $otherUser->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->putJson("/api/tasks/{$task->id}", [
+                'title' => 'Updated Task',
+            ]);
+
+        $response->assertStatus(403);
+    }
+
+    public function test_user_can_update_task_attachment(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'attachment' => 'attachments/old-file.pdf',
+        ]);
+
+        Storage::disk('public')->put('attachments/old-file.pdf', 'old content');
+
+        $newFile = UploadedFile::fake()->create('new-document.pdf', 100);
+
+        $response = $this->actingAs($user)
+            ->putJson("/api/tasks/{$task->id}", [
+                'title' => $task->title,
+                'attachment' => $newFile,
+            ]);
+
+        $response->assertStatus(200);
+
+        $task->refresh();
+        Storage::disk('public')->assertExists($task->attachment);
+        Storage::disk('public')->assertMissing('attachments/old-file.pdf');
+    }
+
+    public function test_user_can_delete_task_in_their_project(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->deleteJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(204);
+
+        $this->assertDatabaseMissing('tasks', [
+            'id' => $task->id,
+        ]);
+    }
+
+    public function test_user_cannot_delete_task_in_other_users_project(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $otherUser->id]);
+        $task = Task::factory()->create(['project_id' => $project->id]);
+
+        $response = $this->actingAs($user)
+            ->deleteJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(403);
+
+        $this->assertDatabaseHas('tasks', [
+            'id' => $task->id,
+        ]);
+    }
+
+    public function test_deleting_task_removes_attachment(): void
+    {
+        Storage::fake('public');
+
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+        $task = Task::factory()->create([
+            'project_id' => $project->id,
+            'attachment' => 'attachments/file.pdf',
+        ]);
+
+        Storage::disk('public')->put('attachments/file.pdf', 'content');
+
+        $response = $this->actingAs($user)
+            ->deleteJson("/api/tasks/{$task->id}");
+
+        $response->assertStatus(204);
+
+        Storage::disk('public')->assertMissing('attachments/file.pdf');
+    }
+
+    public function test_user_cannot_create_task_with_invalid_status(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'status' => 'invalid_status',
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['status']);
+    }
+
+    public function test_user_cannot_create_task_with_past_due_date(): void
+    {
+        $user = User::factory()->create();
+        $project = Project::factory()->create(['user_id' => $user->id]);
+
+        $response = $this->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/tasks", [
+                'title' => 'Test Task',
+                'due_date' => now()->subDays(1)->format('Y-m-d'),
+            ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['due_date']);
+    }
+}

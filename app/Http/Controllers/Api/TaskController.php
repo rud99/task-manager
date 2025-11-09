@@ -14,11 +14,6 @@ use Illuminate\Support\Facades\Storage;
 
 class TaskController extends Controller
 {
-    public function __construct()
-    {
-        $this->authorizeResource(Task::class, 'task');
-    }
-
     public function index(Request $request, Project $project): AnonymousResourceCollection
     {
         $this->authorize('view', $project);
@@ -55,11 +50,15 @@ class TaskController extends Controller
 
     public function show(Task $task): TaskResource
     {
+        $this->authorize('view', $task);
+
         return new TaskResource($task->load('assignee'));
     }
 
     public function update(TaskRequest $request, Task $task): TaskResource
     {
+        $this->authorize('update', $task);
+
         $data = $request->validated();
 
         if ($request->hasFile('attachment')) {
@@ -76,6 +75,8 @@ class TaskController extends Controller
 
     public function destroy(Task $task): JsonResponse
     {
+        $this->authorize('delete', $task);
+
         if ($task->attachment) {
             Storage::disk('public')->delete($task->attachment);
         }
