@@ -45,3 +45,5 @@ jobs:
           ${{ env.USER_DATA_PATH }}/bin/php artisan optimize
 
           ${{ env.USER_DATA_PATH }}/bin/php artisan up
+          ${{ env.USER_DATA_PATH }}/bin/php artisan l5-swagger:generate
+          ${{ env.USER_DATA_PATH }}/bin/php artisan test
