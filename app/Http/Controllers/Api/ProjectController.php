@@ -15,7 +15,7 @@ class ProjectController extends Controller
 {
     #[OA\Get(
         path: '/api/projects',
-        summary: 'Получить список проектов пользователя',
+        summary: 'Получить список всех проектов',
         security: [['bearerAuth' => []]],
         tags: ['Projects'],
         responses: [
@@ -46,7 +46,7 @@ class ProjectController extends Controller
     )]
     public function index(): AnonymousResourceCollection
     {
-        $projects = auth()->user()->projects()->latest()->get();
+        $projects = Project::query()->latest()->get();
 
         return ProjectResource::collection($projects);
     }
@@ -92,7 +92,7 @@ class ProjectController extends Controller
     )]
     public function store(ProjectRequest $request): ProjectResource
     {
-        $project = auth()->user()->projects()->create($request->validated());
+        $project = Project::query()->create($request->validated());
 
         return new ProjectResource($project);
     }
@@ -138,8 +138,6 @@ class ProjectController extends Controller
     )]
     public function show(Project $project): ProjectResource
     {
-        $this->authorize('view', $project);
-
         return new ProjectResource($project);
     }
 
@@ -195,8 +193,6 @@ class ProjectController extends Controller
     )]
     public function update(ProjectRequest $request, Project $project): ProjectResource
     {
-        $this->authorize('update', $project);
-
         $project->update($request->validated());
 
         return new ProjectResource($project);
@@ -228,8 +224,6 @@ class ProjectController extends Controller
     )]
     public function destroy(Project $project): JsonResponse
     {
-        $this->authorize('delete', $project);
-
         $project->delete();
 
         return response()->json(['message' => 'Project deleted successfully'], 204);

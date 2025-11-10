@@ -16,10 +16,10 @@ class TaskTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_user_can_get_tasks_for_their_project(): void
+    public function test_user_can_get_tasks_for_any_project(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $tasks = Task::factory(3)->create(['project_id' => $project->id]);
 
@@ -30,22 +30,10 @@ class TaskTest extends TestCase
             ->assertJsonCount(3, 'data');
     }
 
-    public function test_user_cannot_get_tasks_for_other_users_project(): void
-    {
-        $user = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $otherUser->id]);
-
-        $response = $this->actingAs($user)
-            ->getJson("/api/projects/{$project->id}/tasks");
-
-        $response->assertStatus(403);
-    }
-
     public function test_user_can_filter_tasks_by_status(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         Task::factory()->create([
             'project_id' => $project->id,
@@ -73,7 +61,7 @@ class TaskTest extends TestCase
         $user = User::factory()->create();
         $assignee1 = User::factory()->create();
         $assignee2 = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         Task::factory()->create([
             'project_id' => $project->id,
@@ -94,7 +82,7 @@ class TaskTest extends TestCase
     public function test_user_can_filter_tasks_by_exact_due_date(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $targetDate = now()->addDays(5)->format('Y-m-d');
 
@@ -118,7 +106,7 @@ class TaskTest extends TestCase
     public function test_user_can_filter_tasks_by_due_date_range(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         Task::factory()->create([
             'project_id' => $project->id,
@@ -147,11 +135,11 @@ class TaskTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
-    public function test_user_can_create_task_in_their_project(): void
+    public function test_user_can_create_task_in_any_project(): void
     {
         $user = User::factory()->create();
         $assignee = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [
@@ -172,24 +160,10 @@ class TaskTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_create_task_in_other_users_project(): void
-    {
-        $user = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $otherUser->id]);
-
-        $response = $this->actingAs($user)
-            ->postJson("/api/projects/{$project->id}/tasks", [
-                'title' => 'Test Task',
-            ]);
-
-        $response->assertStatus(403);
-    }
-
     public function test_user_can_create_task_with_attachments(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $file = UploadedFile::fake()->create('document.pdf', 100);
 
@@ -206,10 +180,10 @@ class TaskTest extends TestCase
         $this->assertCount(1, $task->getMedia('attachments'));
     }
 
-    public function test_user_can_view_task_in_their_project(): void
+    public function test_user_can_view_any_task(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
         $task = Task::factory()->create(['project_id' => $project->id]);
 
         $response = $this->actingAs($user)
@@ -220,23 +194,10 @@ class TaskTest extends TestCase
             ->assertJsonPath('data.title', $task->title);
     }
 
-    public function test_user_cannot_view_task_in_other_users_project(): void
+    public function test_user_can_update_any_task(): void
     {
         $user = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $otherUser->id]);
-        $task = Task::factory()->create(['project_id' => $project->id]);
-
-        $response = $this->actingAs($user)
-            ->getJson("/api/tasks/{$task->id}");
-
-        $response->assertStatus(403);
-    }
-
-    public function test_user_can_update_task_in_their_project(): void
-    {
-        $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
         $task = Task::factory()->create([
             'project_id' => $project->id,
             'status' => TaskStatus::Planned,
@@ -259,25 +220,10 @@ class TaskTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_update_task_in_other_users_project(): void
-    {
-        $user = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $otherUser->id]);
-        $task = Task::factory()->create(['project_id' => $project->id]);
-
-        $response = $this->actingAs($user)
-            ->putJson("/api/tasks/{$task->id}", [
-                'title' => 'Updated Task',
-            ]);
-
-        $response->assertStatus(403);
-    }
-
     public function test_user_can_update_task_attachments(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
         $task = Task::factory()->create(['project_id' => $project->id]);
 
         $oldFile = UploadedFile::fake()->create('old-document.pdf', 100);
@@ -299,10 +245,10 @@ class TaskTest extends TestCase
         $this->assertEquals('new-document.pdf', $task->getFirstMedia('attachments')->file_name);
     }
 
-    public function test_user_can_delete_task_in_their_project(): void
+    public function test_user_can_delete_any_task(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
         $task = Task::factory()->create(['project_id' => $project->id]);
 
         $response = $this->actingAs($user)
@@ -315,27 +261,10 @@ class TaskTest extends TestCase
         ]);
     }
 
-    public function test_user_cannot_delete_task_in_other_users_project(): void
-    {
-        $user = User::factory()->create();
-        $otherUser = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $otherUser->id]);
-        $task = Task::factory()->create(['project_id' => $project->id]);
-
-        $response = $this->actingAs($user)
-            ->deleteJson("/api/tasks/{$task->id}");
-
-        $response->assertStatus(403);
-
-        $this->assertDatabaseHas('tasks', [
-            'id' => $task->id,
-        ]);
-    }
-
     public function test_deleting_task_removes_attachments(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
         $task = Task::factory()->create(['project_id' => $project->id]);
 
         $file = UploadedFile::fake()->create('file.pdf', 100);
@@ -356,7 +285,7 @@ class TaskTest extends TestCase
     public function test_user_cannot_create_task_with_invalid_status(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [
@@ -371,7 +300,7 @@ class TaskTest extends TestCase
     public function test_user_cannot_create_task_with_past_due_date(): void
     {
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [
@@ -389,7 +318,7 @@ class TaskTest extends TestCase
 
         $user = User::factory()->create();
         $assignee = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [
@@ -415,7 +344,7 @@ class TaskTest extends TestCase
         Notification::fake();
 
         $user = User::factory()->create();
-        $project = Project::factory()->create(['user_id' => $user->id]);
+        $project = Project::factory()->create();
 
         $response = $this->actingAs($user)
             ->postJson("/api/projects/{$project->id}/tasks", [

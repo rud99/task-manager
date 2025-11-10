@@ -123,8 +123,6 @@ class TaskController extends Controller
     )]
     public function index(Request $request, Project $project): AnonymousResourceCollection
     {
-        $this->authorize('view', $project);
-
         $query = $project->tasks()->with('assignee');
 
         if ($request->filled('status')) {
@@ -203,8 +201,6 @@ class TaskController extends Controller
     )]
     public function store(TaskRequest $request, Project $project): TaskResource
     {
-        $this->authorize('view', $project);
-
         $data = $request->except('attachments');
 
         $task = $project->tasks()->create($data);
@@ -251,8 +247,6 @@ class TaskController extends Controller
     )]
     public function show(Task $task): TaskResource
     {
-        $this->authorize('view', $task);
-
         return new TaskResource($task->load('assignee'));
     }
 
@@ -307,8 +301,6 @@ class TaskController extends Controller
     )]
     public function update(TaskRequest $request, Task $task): TaskResource
     {
-        $this->authorize('update', $task);
-
         $data = $request->except('attachments');
 
         $task->update($data);
@@ -349,8 +341,6 @@ class TaskController extends Controller
     )]
     public function destroy(Task $task): JsonResponse
     {
-        $this->authorize('delete', $task);
-
         $task->delete();
 
         return response()->json(['message' => 'Task deleted successfully'], 204);

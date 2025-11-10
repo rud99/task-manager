@@ -257,7 +257,7 @@
                 "tags": [
                     "Projects"
                 ],
-                "summary": "Получить список проектов пользователя",
+                "summary": "Получить список всех проектов",
                 "operationId": "fbc21feeb3df8a2cb519efb6480ae7d9",
                 "responses": {
                     "200": {
