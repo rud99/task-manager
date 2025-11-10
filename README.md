@@ -10,6 +10,7 @@ cp .env.example .env
 php artisan key:generate
 
 php artisan app:refresh
+php artisan l5-swagger:generate
 php artisan test
 ```
 ### Dev & Prod
@@ -18,6 +19,7 @@ php artisan test
 ## Прочее
 ### Команнды
 ```php artisan app:refresh``` - возвращает приложение к исходному состоянию.
+
 ```php artisan l5-swagger:generate``` - генерируем документацию по API.
 
 ### Оптимизация 
